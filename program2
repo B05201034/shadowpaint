@@ -1,0 +1,48 @@
+Ori = imread('56ej;.png');
+imshow(Ori)
+
+A = double(Ori);
+[m,n,k] = size(A);
+
+    question = 'How many points you choose'
+    n_times = input(question);
+    if isempty(n_times)
+        n_times = 0 ;
+    end
+    Y = A;
+    norm_Y = zeros(m,n);
+    black = logical(zeros(m,n));
+     while n_times > 0 
+        imshow(Ori)
+        [xc,yc] = ginput(n_times);
+        
+        xc = round(xc);
+        yc = round(yc);
+        Z = Y;
+        for nth = 1:n_times
+            for i = 1:3
+                for x = 1:n
+                   for y = 1:m
+                        Y( y,x,i ) =  abs( Z( y,x,i ) -  Z( yc(nth),xc(nth),i ) );
+                   end
+                end
+            end
+          norm_Y = sqrt( (Y(:,:,1)).^2 + (Y(:,:,2)).^2 + (Y(:,:,3)).^2 );
+          black = (black) | (norm_Y < 20) ;
+        end
+        S = 255*uint8(black);
+        imshow(S)
+        
+        
+        
+        n_times = 0;
+        question = 'How many points you choose'
+        n_times = input(question);
+        if isempty(n_times)
+            n_times = 0 ;
+        end
+     end
+    S = 255*uint8(black);
+    
+    imshow(S)
+    
