@@ -1,0 +1,405 @@
+% read image
+%Ori = imread('logo.png');
+Ori = imread('pZ6Vop2dlqOVp6c-500x622.jpg');
+%Ori = imread('test1.png');
+%Ori = imread('Pachi.png');
+imshow(Ori)
+figure
+
+A = double(Ori);
+[m,n,k] = size(A);
+
+if k==3
+    
+    % Get Red, Green, Blue
+    %R = A(:,:,1);
+    %G = A(:,:,2);
+    %B = A(:,:,3);
+    
+    % convert rgb to grayscale 
+    %gr = zeros(m,n);
+    %gr = 0.2989*double(R) + 0.5870*double(G) + 0.1140*double(B);
+    %gr = uint8(gr);
+    %imshow(gr);
+    
+    % find the boundary
+    P = [1 1 1; 1 -8 1; 1 1 1];
+    
+   
+    con_A_R = abs(conv2(P,A(:,:,1))); 
+    con_A_G = abs(conv2(P,A(:,:,2)));
+    con_A_B = abs(conv2(P,A(:,:,3)));
+    
+    norm_A = sqrt( (con_A_R).^2 + (con_A_G).^2 + (con_A_B).^2 );
+    bd_A = norm_A>60;
+    
+    
+    % Get rid of isolated points
+    C = double(bd_A);
+    iso = zeros(m,n);
+    for i = 2:m+1
+        for j = 2:n+1
+            % M returns surrounding points
+            M = C(i-1:i+1,j-1:j+1);
+            % indi gives the numbers of surrounding points
+            indi = 0;
+            indi = sum(M(:))-C(i,j);
+            % eliminate isolated point if # surround points <= 2 
+            if indi < 3
+                iso(i-1,j-1) = 0;
+            else
+                iso(i-1,j-1) = C(i,j);
+            end
+        end
+    end
+    
+    % convert iso into grayscale
+    C = 255*uint8(iso);
+    %imshow(C)
+    %figure
+    
+    % expn is the expansion of matrix for isolated points
+    expn = zeros(m+2,n+2);
+    expn(2:m+1,2:n+1) = iso(:,:);
+    
+    % "filled" fills the hole on the boundary
+    for i = 2:m+1
+        for j = 2:n+1
+            % only consider those not boundary points
+            if expn(i,j) == 0
+            % M returns surrounding points
+                M = expn(i-1:i+1,j-1:j+1);
+                % indi gives the numbers of surrounding points
+                indi = 0;
+                indi = sum(M(:))-expn(i,j);                 
+                % fill the hole if it is a hole with 7 or 8 surrounding
+                % points which is the boundary point
+                if indi>6
+                    filled(i-1,j-1) = 1;
+                else
+                    filled(i-1,j-1) = expn(i,j);
+                end
+            else
+                filled(i-1,j-1) = expn(i,j);
+            end
+        end
+    end
+    
+    %convert filled into gray scale
+    C = 255*uint8(filled);
+    imshow(C)
+    
+
+    
+    % "int" is to catch the interior points
+    int = zeros(m,n);
+    int = filled;
+    
+    % Let "filled" not only record the boundary of the object but the frame
+    % of the picture  
+    fr = ones(m,n);
+    fr_int = ones(m-2,n-2);
+    fr(2:m-1,2:n-1) = fr(2:m-1,2:n-1) - fr_int;
+    filled = filled + 2*fr;
+    %spy(filled)
+    %figure
+    
+    % Define the interior
+    % If a point which is not a boundary, then the necessary condition is 
+    % that it must hit the boundary of the object when it goes from itself 
+    % to any direction. 
+    for i = 2:m-1
+        for j = 2:n-1
+            if filled(i,j)==0
+                left = 0;
+                p = 1;
+                while left == 0
+                    left = filled(i,j-p);
+                    p = p+1;
+                end
+                
+                right = 0;
+                q = 1;
+                while right == 0
+                    right = filled(i,j+q);
+                    q = q+1;
+                end
+                
+                up = 0;
+                r = 1;
+                while up == 0
+                    up = filled(i-r,j);
+                    r = r+1;
+                end
+                
+                down = 0;
+                s = 1;
+                while down == 0
+                    down = filled(i+s,j);
+                    s = s+1;
+                end
+                
+                if left == 1 && right == 1 && up == 1 && down == 1
+                    int(i,j) = 1;
+                else
+                    int(i,j) = 0;
+                end
+            else
+                int(i,j) = filled(i,j);
+            end
+        end
+    end
+    
+    %convert "int" into gray scale
+    C = 255*uint8(int);
+figure
+    imshow(C)
+    figure
+    
+    % "ext" tries to catch the exterior points of the object
+    % Construct "ext"
+    ext = zeros(m,n);
+    
+    % Let the frame be 2
+    ext = ext+2*fr;
+    
+    % Let the interior points be 4
+    ext(2:m-1,2:n-1) = 4*int(2:m-1,2:n-1);
+    
+    %spy(ext)
+    %figure
+    
+    % Let the boundary be 1
+    for i = 2:m-1
+        for j = 2:n-1
+            if filled(i,j) == 1
+                ext(i,j) = 1;
+            end
+        end
+    end
+    
+    % Let the exterior point be 3
+    ext(ext == 0) = 3;
+    
+    % "num3" gives the number of exterior points
+    % "num5" gives the number of exterior points after iteration
+    ext3 = (ext == 3);
+    ext3 = double(ext3);
+    num3 = sum(ext3(:))
+    num5 = 0
+    
+    % For an exterior point, it only passes through "other exterior points"
+    % until hitting the boundary of the object or the frame
+    % The original exterior points are denoted as "3", so we denote the new
+    % exterior points as "5" if it's originally an exterior point or it's
+    % passed when the origianl exterior point goes on all 4 direction
+    % before hitting boundary or frame.
+    while ((num3 - num5) ~= 0)
+        ext3 = (ext == 3);
+        ex3 = double(ext3);
+        num3 = sum(ext3(:))
+        for i = 2:m-1
+            for j = 2:n-1
+                if (ext(i,j) == 3) || (ext(i,j) == 5)
+                    ext(i,j) = 5;
+                    
+                    right = 0;
+                    p = 1;
+                    right = ext(i,j+1);
+                    while right == 3 || right == 4 || right == 5
+                        right = ext(i,j+p);
+                        if (right == 3) || (right == 4)
+                            ext(i,j+p) = 5;
+                            right = 3;
+                        end
+                        p = p+1;
+                    end
+                    
+                    left = 0;
+                    q = 1;
+                    left = ext(i,j-1);
+                    while left == 3 || left == 4 ||left == 5
+                        left = ext(i,j-q);
+                        if (left == 3) || (left == 4)
+                            ext(i,j-q) = 5;
+                            left = 3;
+                        end
+                        q = q+1;
+                    end
+                   
+                    up = 0;
+                    r = 1;
+                    up = ext(i-1,j);
+                    while up == 3 || up == 4|| up == 5
+                        up = ext(i-r,j);
+                        if (up == 3) || (up == 4)
+                            ext(i-r,j) = 5;
+                            up = 3;
+                        end
+                        r = r+1;
+                    end    
+                    
+                    down = 0;
+                    s = 1;
+                    down = ext(i+1,j);
+                    while down == 3 || down == 4 ||down == 5
+                        down = ext(i+s,j);
+                        if (down == 3) || (down == 4)
+                            ext(i+s,j) = 5;
+                            down = 3;
+                        end
+                        s = s+1;
+                    end
+                
+                end
+            end
+        end
+        
+        % Calculate the number of new exterior points
+        ext5 = (ext == 5);
+        ext5 = double(ext5);
+        num5 = sum(ext5(:))
+        ext(ext == 5) = 3;
+    end
+    
+    %Convert "ext" into gray scale
+    C = 255*uint8(ext);
+    %imshow(C)
+    %figure
+   
+    % "fin" indicates the finished picture.
+    % "fin" returns the frame and exterior points.
+    % Recall: ext == 2 is the frame; ext == 3 is the boundary
+    fin = zeros(m,n);
+    int_det = ((ext == 2)|(ext == 3));
+    fin(int_det) = 1;
+    fin = logical(fin);
+    imshow(fin)
+    figure
+    % Leave the interior and boundary of the object and get ride of the 
+    % other part on the original picture
+    Ori_int = Ori;
+    for k = 1:3
+        F = zeros(m,n);
+        F = Ori_int(:,:,k);
+        F(fin) = 255;
+        Ori_int(:,:,k) = F;
+    end
+
+    Ori_int = uint8(Ori_int);
+    imshow(Ori_int)
+    
+    % Ask the user whether there is any exterior points inside the object.
+    % If the user does not reply, then default as no.
+    question = 'Is there any exterior points inside the object? Y/N (default as N)'
+    str = input(question,'s');
+    if isempty(str)
+        str = 'N';
+    end
+    
+    % If there is exterior, then mark it as an exterior point "3" and 
+    % get rid of it. Repeat the process until the user stops it.
+    while str == 'Y'
+        [x_ex,y_ex] = ginput(1)
+        figure
+        x_ex = round(x_ex);
+        y_ex = round(y_ex);
+        ext(y_ex,x_ex) = 3;
+        
+        ext3 = (ext == 3);
+        ext3 = double(ext3);
+        num3 = sum(ext3(:))
+        while ((num3 - num5) ~= 0)
+            ext3 = (ext == 3);
+            ext3 = double(ext3);
+            num3 = sum(ext3(:))
+            for i = 2:m-1
+                for j = 2:n-1
+                    if (ext(i,j) == 3) || (ext(i,j) == 5)
+                        ext(i,j) = 5;
+                    
+                        right = 0;
+                        p = 1;
+                        right = ext(i,j+1);
+                        while right == 3 || right == 4 || right == 5
+                            right = ext(i,j+p);
+                            if (right == 3) || (right == 4)
+                            ext(i,j+p) = 5;
+                            right = 3;
+                            end
+                            p = p+1;
+                        end
+                    
+                        left = 0;
+                        q = 1;
+                        left = ext(i,j-1);
+                        while left == 3 || left == 4 || left == 5
+                            left = ext(i,j-q);
+                            if (left == 3) || (left == 4)
+                                ext(i,j-q) = 5;
+                                left = 3;
+                            end
+                            q = q+1;
+                        end
+                   
+                        up = 0;
+                        r = 1;
+                        up = ext(i-1,j);
+                        while up == 3 || up == 4 || up == 5
+                            up = ext(i-r,j);
+                            if (up == 3) || (up == 4)
+                                ext(i-r,j) = 5;
+                                up = 3;
+                            end
+                            r = r+1;
+                        end    
+                    
+                        down = 0;
+                        s = 1;
+                        down = ext(i+1,j);
+                        while down == 3 || down == 4 || down == 5
+                            down = ext(i+s,j);
+                            if (down == 3) || (down == 4)
+                                ext(i+s,j) = 5;
+                                down = 3;
+                            end
+                            s = s+1;
+                        end
+                    end    
+                end
+            end
+        
+        
+            % Calculate the number of new exterior points
+            ext5 = (ext == 5);
+            ext5 = double(ext5);
+            num5 = sum(ext5(:))
+            ext(ext == 5) = 3;
+        end
+        
+        % "fin" gives the exterior of the finished picture.
+        % Recall: ext == 2 is the frame and ext == 3 is the exterior
+        fin = zeros(m,n);
+        int_det = ((ext == 2)|(ext == 3));
+        fin(int_det) = 1;
+        fin = logical(fin);
+        
+        Ori_int = Ori;
+        for k = 1:3
+            F = zeros(m,n);
+            F = Ori_int(:,:,k);
+            F(fin) = 255;
+            Ori_int(:,:,k) = F;
+        end
+        
+        Ori_int = uint8(Ori_int);
+        imshow(Ori_int)  
+        question = 'Is there any exterior points inside the object? Y/N (default as N)'
+        str = input(question,'s');
+        if isempty(str)
+            str = 'N';
+        end
+    end
+else
+    return
+end
